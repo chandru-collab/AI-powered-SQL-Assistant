@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI SQL Analytics Assistant</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+    <div class="glass-bg"></div>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="logo">
+                <i class="fa-solid fa-brain-circuit brand-icon"></i>
+                <div class="logo-text">
+                    <h1>SQL.<span>AI</span></h1>
+                    <p>Dynamic AI Analytics Client</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-secondary" id="open-connect-btn">
+                    <i class="fa-solid fa-server"></i> <span id="connection-badge-text">Connect MySQL</span>
+                </button>
+                <button class="btn-secondary" id="toggle-history-btn">
+                    <i class="fa-solid fa-list-check"></i> Audit Logs
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="app-workspace">
+
+            <!-- Left Side: Chat Conversational Interface with Schema Explorer Tabs -->
+            <section class="workspace-panel chat-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-desktop"></i> Console Pane</h2>
+                    <button class="btn-clear" id="clear-chat-btn" title="Clear conversation memory">
+                        <i class="fa-solid fa-trash-arrow-up"></i> Reset Memory
+                    </button>
+                </div>
+
+                <!-- Tabs -->
+                <div class="panel-tabs">
+                    <button class="tab-btn active" id="tab-chat-btn">
+                        <i class="fa-solid fa-comments"></i> AI Chat
+                    </button>
+                    <button class="tab-btn" id="tab-schema-btn">
+                        <i class="fa-solid fa-database"></i> Schema Explorer
+                    </button>
+                </div>
+
+                <!-- Tab 1: AI Chat Assistant -->
+                <div class="tab-content active" id="tab-chat-content">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system-message">
+                            <div class="message-icon">
+                                <i class="fa-solid fa-robot"></i>
+                            </div>
+                            <div class="message-content">
+                                <p>Hello! I am your AI SQL Assistant. I can write and execute MySQL queries against
+                                    whatever database is currently connected. Currently connected to default demo
+                                    database. Ask me anything in plain English!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Suggestions / Prompt Chips -->
+                    <div class="suggestion-chips" id="suggestion-chips-container">
+                        <button class="chip" data-prompt="How many orders were placed last month?">
+                            "Orders placed last month"
+                        </button>
+                        <button class="chip" data-prompt="Show top 5 customers by number of orders">
+                            "Top 5 customers by orders"
+                        </button>
+                        <button class="chip" data-prompt="What is the total quantity sold per product category?">
+                            "Sales quantity by category"
+                        </button>
+                        <button class="chip" data-prompt="Delete all tables in database">
+                            "Test safety block (DROP)"
+                        </button>
+                    </div>
+
+                    <!-- Chat Input Form -->
+                    <form class="chat-input-container" id="chat-form">
+                        <input type="text" id="chat-input" placeholder="Ask a business query..." required
+                            autocomplete="off">
+                        <button type="submit" class="btn-primary" id="send-btn">
+                            <span>Send</span>
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Tab 2: Dynamic Schema Explorer -->
+                <div class="tab-content" id="tab-schema-content" style="display: none;">
+                    <div class="schema-explorer-container">
+                        <div class="schema-explorer-header">
+                            <div class="db-title-row">
+                                <i class="fa-solid fa-database db-icon"></i>
+                                <div>
+                                    <h3 id="schema-db-name">ai_sql_assistant</h3>
+                                    <p>Active Database Connection</p>
+                                </div>
+                            </div>
+                            <button class="btn-clear" id="disconnect-db-btn" style="display:none;"
+                                title="Disconnect and revert to demo database">
+                                <i class="fa-solid fa-plug-circle-xmark"></i> Disconnect
+                            </button>
+                        </div>
+                        <div class="schema-tree" id="schema-tree-view">
+                            <!-- Discovered tables and column trees -->
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right Side: SQL execution, table data, visual charts, business explanation -->
+            <section class="workspace-panel analyzer-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-line"></i> Query Analyzer & Visualizer</h2>
+                    <div class="badge-row">
+                        <span class="badge" id="safety-badge" style="display:none;">Safe Mode</span>
+                        <span class="badge" id="time-badge" style="display:none;">0.00ms</span>
+                    </div>
+                </div>
+
+                <div class="analyzer-content" id="analyzer-placeholder">
+                    <div class="empty-state">
+                        <i class="fa-solid fa-wand-magic-sparkles empty-icon"></i>
+                        <h3>Awaiting Query Analysis</h3>
+                        <p>Ask a question in the chat panel to see the generated SQL, query execution results, chart
+                            visualizations, and AI business explanations here.</p>
+                    </div>
+                </div>
+
+                <div class="analyzer-content" id="analyzer-results" style="display: none;">
+
+                    <!-- Section: SQL & Technical Details -->
+                    <div class="analyzer-section sql-section">
+                        <div class="section-title">
+                            <h3><i class="fa-solid fa-code"></i> Generated SQL Query</h3>
+                            <button class="btn-icon-text" id="copy-sql-btn">
+                                <i class="fa-solid fa-copy"></i> <span>Copy</span>
+                            </button>
+                        </div>
+                        <div class="code-container">
+                            <pre><code id="generated-sql-code">SELECT * FROM customers;</code></pre>
+                        </div>
+                        <div class="technical-explanation" id="technical-explanation">
+                            This query joins customers with orders to fetch the totals.
+                        </div>
+                    </div>
+
+                    <!-- Section: Chart Visualizer -->
+                    <div class="analyzer-section chart-section" id="chart-container-wrapper" style="display: none;">
+                        <div class="section-title">
+                            <h3><i class="fa-solid fa-chart-pie"></i> Visual Analytics</h3>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="analytics-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Section: Data Table -->
+                    <div class="analyzer-section data-section">
+                        <div class="section-title">
+                            <h3><i class="fa-solid fa-table"></i> Query Results</h3>
+                            <button class="btn-icon-text" id="export-csv-btn">
+                                <i class="fa-solid fa-file-csv"></i> <span>Export CSV</span>
+                            </button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table id="results-table">
+                                <thead>
+                                    <!-- Dynamic Headers -->
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="table-meta" id="table-meta">Showing 0 rows</div>
+                    </div>
+
+                    <!-- Section: AI Plain-English Explanation -->
+                    <div class="analyzer-section business-explanation-section">
+                        <div class="section-title">
+                            <h3><i class="fa-solid fa-message-sparkles"></i> AI Business Insights</h3>
+                        </div>
+                        <div class="explanation-box" id="business-explanation">
+                            Query results show a stable order conversion rate...
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Collapsible History/Audit Log Drawer -->
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="drawer" id="history-drawer">
+        <div class="drawer-header">
+            <h3><i class="fa-solid fa-database"></i> Query Audit Logging</h3>
+            <button class="drawer-close" id="close-drawer-btn">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="drawer-body" id="audit-logs-list">
+            <!-- Dynamic logs -->
+            <div class="log-empty">
+                <p>No audit logs available yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal Dialog -->
+    <div class="modal-overlay" id="connection-modal-overlay"></div>
+    <div class="modal" id="connection-modal">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-circle-nodes"></i> Connect to MySQL Database</h3>
+            <button class="modal-close" id="close-connect-modal-btn">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <form id="connection-form">
+            <div class="modal-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="db-host">Host</label>
+                        <input type="text" id="db-host" placeholder="localhost" required value="localhost">
+                    </div>
+                    <div class="form-group" style="flex: 0 0 110px;">
+                        <label for="db-port">Port</label>
+                        <input type="number" id="db-port" placeholder="3306" required value="3306">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="db-user">Username</label>
+                    <input type="text" id="db-user" placeholder="root" required value="root">
+                </div>
+                <div class="form-group">
+                    <label for="db-password">Password</label>
+                    <input type="password" id="db-password" placeholder="Database password" value="Root">
+                </div>
+                <div class="form-group">
+                    <label for="db-name">Database Name</label>
+                    <input type="text" id="db-name" placeholder="ai_sql_assistant" required value="ai_sql_assistant">
+                </div>
+                <div class="connect-error" id="connect-error-msg" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="cancel-connect-btn">Cancel</button>
+                <button type="submit" class="btn-primary" id="test-connect-btn">
+                    <span>Connect</span> <i class="fa-solid fa-circle-arrow-right"></i>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/app.js?v=4"></script>
+</body>
+
+</html>

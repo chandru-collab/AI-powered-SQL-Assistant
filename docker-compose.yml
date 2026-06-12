@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # MySQL database container
+  db:
+    image: mysql:8.0
+    container_name: sql_ai_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ai_sql_assistant
+    ports:
+      - "3306:3306"
+    volumes:
+      # Automatically initialize database structure and seeds on first container launch
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI web application container
+  web:
+    build: .
+    container_name: sql_ai_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=root
+      - DB_NAME=ai_sql_assistant
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=nex-agi/nex-n2-pro:free
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
