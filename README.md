@@ -1,45 +1,98 @@
 # AI SQL Analytics Assistant 🧠📊
 
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=FastAPI&logoColor=white)](https://fastapi.tiangolo.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![OpenRouter](https://img.shields.io/badge/OpenRouter-nex--agi%2Fnex--n2--pro--free-7c3aed?style=for-the-badge)](https://openrouter.ai/)
+
 A premium, production-grade AI-powered SQL Assistant that converts natural language business questions into valid MySQL queries, executes them safely, and renders data visualizations (Bar, Line, Pie charts) alongside plain-English business insights.
 
-Built using **FastAPI**, **MySQL**, **OpenRouter API (`nex-agi/nex-n2-pro:free`)**, and **Vanilla HTML5/CSS3/JS** with a high-fidelity glassmorphic dark interface.
+Built using **FastAPI**, **MySQL**, **OpenRouter API**, and a modern, high-fidelity **glassmorphic dark UI** with Vanilla HTML5/CSS3/JS.
 
 ---
 
-## 🚀 Key Features
+## 🎨 System Design & Architecture
 
-* **Natural Language to MySQL**: Translates questions like *"How many orders were placed last month?"* or *"List top 5 products by quantity sold"* into precise MySQL code.
-* **Double-Layered SQL Safety Validation**: Hardened validation rule blocks any non-read-only commands (`DELETE`, `UPDATE`, `DROP`, etc.) or multi-statement injections before reaching the database.
-* **Auto-Visualizations**: Evaluates query columns and automatically renders the results into interactive Chart.js graphs (Bar, Line, or Pie charts).
-* **Multi-Turn Conversational Memory**: Remembers past context in a session, allowing business users to ask follow-up questions (e.g. *"Show products under 100 dollars"*, followed by *"Which of them has the category Kitchen?"*).
-* **CSV Export & Code Copier**: Business users can export raw records to CSV immediately, and developers can copy the generated SQL with a click.
-* **Audit Trail Drawer**: Persistent JSON audit logger (`query_logs.json`) tracks queries, execution times, timestamps, and safety badges for auditing.
+The application acts as a safe translation layer between natural language and database tables. Below is the system flow mapping how questions are processed, validated, executed, and analyzed.
+
+### Query Flow Infographic
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 👤 Business User
+    participant FE as 🖥️ Glassmorphic Frontend
+    participant BE as ⚙️ FastAPI Backend
+    participant LLM as 🧠 OpenRouter AI Engine
+    participant DB as 🗄️ MySQL Database
+
+    User->>FE: Enters natural language query
+    FE->>BE: POST /query (question, session_id)
+    BE->>BE: Fetch Database Schema (Cached / Live)
+    BE->>LLM: call_openrouter() with system prompt & schema
+    LLM-->>BE: Returns JSON (SQL, initial explanations, chart config)
+    BE->>BE: validate_sql_safety() (Read-only validation check)
+    alt Safety Check Passes
+        BE->>DB: Executes SQL query
+        DB-->>BE: Returns raw result dataset
+        alt Post-explanation Needed (Optional Fallback)
+            BE->>LLM: Summarize dataset with BI Analyst context
+            LLM-->>BE: Returns plain-English insights
+        end
+        BE->>FE: Returns QueryResponse (SQL, results, chart config, AI insights)
+        FE->>User: Renders interactive charts (Chart.js) + Table + AI Insights
+    else Safety Check Fails
+        BE-->>FE: Returns 400 Bad Request (Safety Error)
+        FE->>User: Displays red warning and blocks execution
+    end
+```
 
 ---
 
-## 🛠️ Technology Stack
+## 🗄️ Database Schema & Structure
 
-* **Backend**: Python 3.10+, FastAPI, PyMySQL, Pydantic, requests, python-dotenv.
-* **Database**: MySQL 8.0
-* **Frontend**: HTML5, Vanilla CSS3 (Custom Glassmorphism, CSS Variables, Animations), Vanilla JS (Fetch API, Chart.js, FontAwesome).
-* **AI Engine**: OpenRouter API invoking `nex-agi/nex-n2-pro:free`.
-* **Packaging**: Docker, Docker Compose.
+The default database consists of three relational tables: `customers`, `products`, and `orders`.
+
+| Table Name | Column Name | Data Type | Key Type | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **`customers`** | `id` | `INT` | `PRIMARY KEY` | Unique customer identifier |
+| | `name` | `VARCHAR` | | Full name of the customer |
+| | `email` | `VARCHAR` | | Email address |
+| | `city` | `VARCHAR` | | Resident city |
+| | `created_at` | `DATE` | | Account creation date |
+| **`products`** | `id` | `INT` | `PRIMARY KEY` | Unique product identifier |
+| | `name` | `VARCHAR` | | Product catalog name |
+| | `category` | `VARCHAR` | | Product category |
+| | `price` | `DECIMAL` | | Price in USD |
+| **`orders`** | `id` | `INT` | `PRIMARY KEY` | Unique order identifier |
+| | `customer_id` | `INT` | `FOREIGN KEY` | References `customers.id` |
+| | `product_id` | `INT` | `FOREIGN KEY` | References `products.id` |
+| | `quantity` | `INT` | | Number of units purchased |
+| | `order_date` | `DATE` | | Purchase date |
 
 ---
 
-## 📋 Database Schema
+## 🛡️ SQL Safety & Validation Matrix
 
-The database consists of three relational tables:
-1. **`customers`**: `id` (INT, PK), `name` (VARCHAR), `email` (VARCHAR), `city` (VARCHAR), `created_at` (DATE)
-2. **`products`**: `id` (INT, PK), `name` (VARCHAR), `category` (VARCHAR), `price` (DECIMAL)
-3. **`orders`**: `id` (INT, PK), `customer_id` (FK -> customers), `product_id` (FK -> products), `quantity` (INT), `order_date` (DATE)
+To prevent SQL injection attacks and destructive database operations, a regex-based word boundary validator blocks any unapproved commands.
+
+| Operation Type | SQL Verb / Syntax | Allowed? | Rationale / Enforced Guardrail |
+| :--- | :--- | :--- | :--- |
+| **Read-Only Queries** | `SELECT`, `WITH`, `SHOW`, `DESCRIBE`, `EXPLAIN` | ✅ **YES** | Allows business users to explore database tables and retrieve records freely. |
+| **Database Modification** | `INSERT`, `UPDATE`, `DELETE`, `REPLACE` | ❌ **NO** | Blocked to protect database integrity and prevent unauthorized modifications. |
+| **Schema Alteration** | `DROP`, `ALTER`, `CREATE`, `TRUNCATE`, `RENAME` | ❌ **NO** | Blocked to prevent schema destruction or unauthorized modifications. |
+| **Admin Operations** | `GRANT`, `REVOKE`, `HANDLER` | ❌ **NO** | Blocked to restrict access levels and secure database privileges. |
+| **File / Shell Access** | `INTO OUTFILE`, `LOAD DATA`, `EXEC`, `EXECUTE` | ❌ **NO** | Blocked to prevent remote code execution (RCE) and local file system leakages. |
+| **Multi-Statement Injections** | `;` (Semicolon separation) | ❌ **NO** | Semicolons are parsed and queries with multiple statements are rejected. |
 
 ---
 
-## ⚙️ Environment Variables
+## ⚡ Setup & Execution Procedure (Using `uv`)
 
-Create a `.env` file in the root directory (this is already created for you locally, and added to `.gitignore` to protect credentials):
+Using **`uv`**, an extremely fast Python package manager and runner, setting up and running the application is clean and quick.
 
+### Step 1: Environment Configuration
+Create a `.env` file in the root directory:
 ```ini
 # OpenRouter API configurations
 OPENROUTER_API_KEY=your_openrouter_api_key_here
@@ -49,77 +102,62 @@ OPENROUTER_MODEL=nex-agi/nex-n2-pro:free
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=root
+DB_PASSWORD=your_root_password
 DB_NAME=ai_sql_assistant
 ```
 
----
+### Step 2: Initialize & Seed Database
+Ensure your local MySQL server is running, then seed the initial schema and mock data:
+```bash
+# Force UTF-8 execution on Windows to render emojis correctly
+python -X utf8 setup_db.py
+```
 
-## 🏁 How to Run
+### Step 3: Virtual Environment Setup with `uv`
+If you do not have `uv` installed, install it via pip or your preferred package manager:
+```bash
+pip install uv
+```
 
-There are two ways to launch the application:
+Now create a virtual environment, activate it, and sync dependencies:
+```bash
+# Create virtual environment
+uv venv
 
-### Option A: Using Docker Compose (Recommended)
-This is the easiest approach as it automatically spins up the MySQL container, runs the schema migrations, seeds realistic dummy data, and boots the FastAPI backend.
+# Activate venv (Windows PowerShell)
+.venv\Scripts\Activate.ps1
 
-1. Ensure **Docker Desktop** is running.
-2. In the project directory, run:
-   ```bash
-   docker compose up --build
-   ```
-3. Once the database healthcheck completes, access the dashboard at:
-   👉 **`http://localhost:8000`**
+# Activate venv (macOS/Linux)
+source .venv/bin/activate
 
----
+# Install all required packages
+uv pip install -r requirements.txt
+```
 
-### Option B: Local Setup (Using python virtual environments)
-If you prefer running the components directly on your machine:
-
-1. **Prerequisite**: Ensure a local **MySQL server** is running, create a database named `ai_sql_assistant`, and execute [schema.sql](file:///c:/Users/chand/OneDrive/Documents/Desktop/sql/schema.sql) on it to initialize tables and insert seed data.
-2. Update your `.env` credentials to match your local database instance.
-3. Install the `uv` tool to manage python environments (or use standard `venv`):
-   ```bash
-   pip install uv
-   ```
-4. Create and activate a virtual environment:
-   ```bash
-   # Create venv
-   uv venv
-   
-   # Activate venv (Windows PowerShell)
-   .venv\Scripts\Activate.ps1
-   # (Or macOS/Linux)
-   source .venv/bin/activate
-   ```
-5. Install packages:
-   ```bash
-   uv pip install -r requirements.txt
-   ```
-6. Run the server:
-   ```bash
-   uvicorn app:app --reload --port 8000
-   ```
-7. Visit the dashboard at **`http://localhost:8000`**.
+### Step 4: Run the Application Server
+Run the FastAPI backend with uvicorn:
+```bash
+uvicorn app:app --reload --port 8000
+```
+Open your browser and navigate to 👉 **`http://localhost:8000`** to access the dashboard.
 
 ---
 
-## 🧪 Running Unit Tests
+## 🧪 Testing
 
-To run the automated validation tests checking the query safety rules:
+We verify the SQL Safety Validator rules against a suite of safe/unsafe test cases:
 ```bash
 python test_app.py
 ```
 
 ---
 
-## 📡 API Usage & Examples
+## 📡 API Usage Reference
 
 ### `POST /query`
 Submits a natural language query for processing.
 
-**Request:**
-* Headers: `Content-Type: application/json`
-* Body:
+**Request Body:**
 ```json
 {
   "question": "Show top 5 customers by number of orders",
@@ -146,22 +184,3 @@ Submits a natural language query for processing.
   "execution_time_ms": 142.5
 }
 ```
-
-### `GET /history`
-Returns audit logs for the last 100 query executions.
-
----
-
-## 🏛️ Architectural Decisions
-
-1. **Separation of SQL Generation and Business Explanation**: The LLM is first asked to act as a SQL Engineer to translate English to SQL. The SQL is executed locally by Python, and the raw dataset is then supplied to the LLM (acting as a BI Analyst) to generate a conversational, accurate explanation. This avoids "AI hallucinations" of numbers since the analysis is grounded in real database outputs.
-2. **Regex Word Boundary Safety Parser**: Using `re.search(r'\bKEYWORD\b', ...)` prevents simple bypasses (e.g. `DROPtable` vs `DROP table`) and blocks command concatenation via semicolons while preserving normal text fields that might match parts of the keywords.
-3. **Seeding Seperation**: Seeding is handled via the Docker database initialisation folder `/docker-entrypoint-initdb.d/`, isolating seeding logic from application runtime.
-4. **Mock Timeline Baseline**: Set baseline date to **June 10, 2026** inside the system prompts to ensure relative datetime references (like *"last month"*) evaluate correctly against the dummy dataset (which has orders in March, April, May, and June 2026).
-
----
-
-## ⚠️ Assumptions and Limitations
-
-* **Read-Only Enforcements**: Modifying queries are blocked. If a user asks *"Change my email to bob@gmail.com"*, the safety validator will intercept the SQL query and return a safety exception without sending it to the MySQL server.
-* **Schema Bounds**: The AI model will only output SQL matching the tables defined in `schema.sql`. It will return a friendly error message if asked about tables that don't exist (e.g., *"Show current shipping carriers"*).
